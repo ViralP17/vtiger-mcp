@@ -49,7 +49,7 @@ function fail(err: unknown): ToolResult {
   return { content: [{ type: "text", text: `Error: ${message}` }], isError: true };
 }
 
-const server = new McpServer({ name: "vtiger-mcp", version: "0.2.0" });
+const server = new McpServer({ name: "vtiger-mcp", version: "0.2.1" });
 
 /**
  * Register a tool with uniform error handling. `server.tool` is cast to
