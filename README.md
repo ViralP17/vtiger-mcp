@@ -21,6 +21,49 @@ already allows.
 
 ---
 
+## 🤖 Install with an AI agent (copy-paste prompt)
+
+Don't want to edit config files yourself? Copy the whole prompt below and
+paste it into an AI agent that can edit files (Claude Code, Cursor,
+Windsurf, Gemini CLI, OpenAI Codex, VS Code Copilot Agent, …). It will ask
+for your details and set everything up for you.
+
+```text
+Install and configure the "vtiger-mcp" MCP server for me (npm package name: vtiger-mcp).
+It lets me log vtiger CRM timesheets and create/update records in any module from this agent.
+
+Do this:
+1. Verify Node.js 18+ is installed (run: node --version). If it's missing, tell me to install
+   the LTS from https://nodejs.org and stop.
+2. Ask me for these and WAIT for my answers:
+   - VTIGER_URL: my vtiger base URL, e.g. https://yourcrmdomain.com (no /webservice.php)
+   - VTIGER_USERNAME: my vtiger login username
+   - VTIGER_ACCESS_KEY: my "Webservice Access Key" from vtiger -> My Preferences (NOT my password)
+3. Detect which MCP client I use and find its config file:
+   - Claude Desktop: %APPDATA%\Claude\claude_desktop_config.json (Windows) or
+     ~/Library/Application Support/Claude/claude_desktop_config.json (macOS)
+   - Cursor: ~/.cursor/mcp.json ; Windsurf: ~/.codeium/windsurf/mcp_config.json ;
+     Gemini CLI: ~/.gemini/settings.json  (all use the "mcpServers" JSON key)
+   - VS Code: ./.vscode/mcp.json  (uses a top-level "servers" key with "type": "stdio")
+   - OpenAI Codex CLI: ~/.codex/config.toml  (TOML table [mcp_servers.vtiger])
+   If you can't tell, ask me which client I'm using.
+4. Back up that file, then MERGE IN (do not overwrite my other servers) a server named "vtiger":
+   command: npx
+   args: ["-y", "vtiger-mcp"]
+   env: { VTIGER_URL, VTIGER_USERNAME, VTIGER_ACCESS_KEY, VTIGER_ALLOW_DELETE: "false" }
+   Use the correct shape for my client (mcpServers JSON, VS Code "servers", or Codex TOML).
+5. Keep my access key ONLY in this local config. Never commit it, echo it back in full, or share it.
+6. (Optional) Verify auth by running, with those env vars set:  npx -p vtiger-mcp vtiger whoami
+   It should print my vtiger userId.
+7. Tell me to fully quit and reopen my client, then try: "list my vtiger modules"
+   or "log 2 hours to <task name> today".
+```
+
+Prefer to do it manually? See **[CLIENTS.md](CLIENTS.md)** for every client's
+exact config.
+
+---
+
 ## Features
 
 - 🔐 **Per-user auth** via each user's Webservice Access Key — row-level
