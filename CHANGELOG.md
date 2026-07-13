@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-07-13
+
+### Added
+- Copy-paste **AI-agent install prompt** in the README — paste it into any
+  file-editing AI agent to install and configure vtiger-mcp automatically.
+- **CLIENTS.md** — per-client setup for Claude Desktop/Code, Cursor,
+  Windsurf, Google Antigravity, VS Code (Copilot), OpenAI Codex CLI, Gemini
+  CLI, and any MCP client.
+- README badges (npm version, license, node).
+
+### Changed
+- Ship `CLIENTS.md` and `CHANGELOG.md` inside the published npm package.
+
 ## [0.2.0] - 2026-07-13
 
 ### Added
@@ -34,5 +47,6 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   vtiger's role/profile and row-level sharing are preserved.
 - Deletes disabled by default (`VTIGER_ALLOW_DELETE=false`).
 
+[0.2.1]: https://github.com/ViralP17/vtiger-mcp/releases/tag/v0.2.1
 [0.2.0]: https://github.com/ViralP17/vtiger-mcp/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ViralP17/vtiger-mcp/releases/tag/v0.1.0
