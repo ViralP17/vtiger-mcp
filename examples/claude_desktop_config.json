@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "vtiger": {
+      "command": "node",
+      "args": ["C:\\path\\to\\vtiger-mcp\\dist\\mcp\\server.js"],
+      "env": {
+        "VTIGER_URL": "https://yourcrmdomain.com",
+        "VTIGER_USERNAME": "your.username",
+        "VTIGER_ACCESS_KEY": "your-16-char-access-key",
+        "VTIGER_ALLOW_DELETE": "false"
+      }
+    }
+  }
+}
