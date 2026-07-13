@@ -1,5 +1,9 @@
 # vtiger-mcp
 
+[![npm version](https://img.shields.io/npm/v/vtiger-mcp?color=cb3837&logo=npm)](https://www.npmjs.com/package/vtiger-mcp)
+[![license: MIT](https://img.shields.io/npm/l/vtiger-mcp?color=blue)](LICENSE)
+[![node](https://img.shields.io/node/v/vtiger-mcp)](https://nodejs.org)
+
 **MCP server + CLI for [vtiger CRM](https://www.vtiger.com/).** Connect any
 AI agent (Claude Desktop, Claude Code, Cursor, …) to your vtiger CRM to
 **log timesheets** and **create / update records in any module** — in
@@ -105,7 +109,10 @@ Point your AI client at `vtiger-mcp` and pass your credentials in `env`.
 
 - **Claude Desktop** config: `%APPDATA%\Claude\claude_desktop_config.json`
   (Windows) / `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
-- **Cursor / Claude Code**: a `.mcp.json` with the same `mcpServers` shape
+
+> 📎 **Using Cursor, VS Code, Windsurf, Antigravity, OpenAI Codex CLI,
+> Gemini CLI, or another client?** See **[CLIENTS.md](CLIENTS.md)** for the
+> exact config file and format for each — it's the same server everywhere.
 
 Then just ask, e.g. *"Log 3 hours to the Website Redesign task today as
 regular hours"* or *"Show my timesheets this week."*

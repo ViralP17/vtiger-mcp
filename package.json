@@ -11,7 +11,9 @@
   "files": [
     "dist",
     "examples",
-    "SETUP.md"
+    "SETUP.md",
+    "CLIENTS.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build": "tsc",
