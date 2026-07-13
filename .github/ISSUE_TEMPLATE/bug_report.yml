@@ -1,0 +1,57 @@
+name: Bug report
+description: Report a problem with vtiger-mcp
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report! **Do not include real access keys, passwords,
+        CRM domains, or customer data** — redact them (e.g. `yourcrmdomain.com`,
+        `17x1234`).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, and what went wrong? Include the exact tool/CLI command and the (sanitized) error.
+      placeholder: |
+        Command: vtiger log-timesheet --task "..." --start 10:00 --end 13:00
+        Error: [ACCESS_DENIED] ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: input
+    id: tool-version
+    attributes:
+      label: vtiger-mcp version
+      placeholder: e.g. 0.2.0
+    validations:
+      required: true
+  - type: input
+    id: vtiger-version
+    attributes:
+      label: vtiger CRM version
+      placeholder: e.g. 6.5.1 / 7.x
+    validations:
+      required: true
+  - type: input
+    id: node-version
+    attributes:
+      label: Node.js version
+      placeholder: e.g. 20.11.0
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Which surface?
+      options:
+        - MCP server (AI agent)
+        - CLI
+        - Both
+    validations:
+      required: true

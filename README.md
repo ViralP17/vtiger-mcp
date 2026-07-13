@@ -161,15 +161,36 @@ vtiger update 17x1234 --set description="Revised notes"
   (`<moduleId>x<recordId>`). Reference fields (owner, `related_to`,
   `projectid`) expect these ids; the timesheet helpers resolve task names
   to ids for you.
-- **The timesheet module name** in this tool defaults to `TimeControl`.
-  If your install uses a different module for time tracking, use the
-  generic `create_record` / `query` tools, or adjust the constants in
-  `src/core/timesheet.ts`.
+- **The timesheet module is configurable** (see below). It defaults to
+  `TimeControl`; point it at your module without touching code.
 - **Deletes are off by default.** Set `VTIGER_ALLOW_DELETE=true` only if you
   want the agent/CLI to delete records (and your account has that right).
 - **Security.** Your access key is a secret — keep it in your local `.env`
   or client config only. Use HTTPS. Nothing is centralized; each user runs
   their own copy with their own key.
+
+## Configuring the timesheet module (other vtiger installs)
+
+The timesheet helpers default to the `TimeControl` module with
+`ProjectTask`/`Project` links. If your install uses different module or
+field names, set these env vars (all optional) — no code changes needed:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `VTIGER_TIMESHEET_MODULE` | `TimeControl` | Time-entry module |
+| `VTIGER_TASK_MODULE` | `ProjectTask` | Module linked from an entry |
+| `VTIGER_PROJECT_MODULE` | `Project` | Project module |
+
+Advanced field-name overrides (rarely needed): `VTIGER_TS_DATE_START_FIELD`,
+`VTIGER_TS_DATE_END_FIELD`, `VTIGER_TS_TIME_START_FIELD`,
+`VTIGER_TS_TIME_END_FIELD`, `VTIGER_TS_RELATED_FIELD`, `VTIGER_TS_DESC_FIELD`,
+`VTIGER_TS_HOURSTYPE_FIELD`, `VTIGER_TS_TOTAL_FIELD`, `VTIGER_TS_OWNER_FIELD`,
+`VTIGER_TASK_NAME_FIELD`, `VTIGER_TASK_PROJECT_FIELD`,
+`VTIGER_PROJECT_NAME_FIELD`. See [.env.example](.env.example) for the full
+list and defaults.
+
+> Whatever your modules are named, the generic `create_record`,
+> `update_record`, `query`, and `describe_module` tools always work.
 
 ## License
 

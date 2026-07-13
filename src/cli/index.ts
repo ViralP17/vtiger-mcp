@@ -3,9 +3,9 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { createClientFromEnv } from "../core/client.js";
 import {
-  TIMESHEET_MODULE,
-  PROJECT_MODULE,
+  timesheetConfigFromEnv,
   findTasks,
+  listProjects,
   buildTimesheetElement,
   listMyTimesheets,
 } from "../core/timesheet.js";
@@ -119,6 +119,7 @@ async function main(): Promise<void> {
   }
 
   const client = createClientFromEnv();
+  const tsCfg = timesheetConfigFromEnv();
 
   switch (command) {
     case "whoami": {
@@ -175,21 +176,17 @@ async function main(): Promise<void> {
       break;
     }
     case "projects":
-      print(
-        await client.query(
-          `SELECT id, projectname, projectstatus FROM ${PROJECT_MODULE} ORDER BY projectname LIMIT 100;`,
-        ),
-      );
+      print(await listProjects(client, tsCfg));
       break;
     case "tasks":
-      print(await findTasks(client, args.positionals[0] ?? ""));
+      print(await findTasks(client, tsCfg, args.positionals[0] ?? ""));
       break;
     case "log-timesheet": {
       await client.listTypes(); // ensure login -> userId
       let taskId: string | undefined;
       const task = flag(args, "task");
       if (task) {
-        const matches = await findTasks(client, task);
+        const matches = await findTasks(client, tsCfg, task);
         if (matches.length === 0) throw new Error(`No task matches "${task}".`);
         if (matches.length > 1) {
           print({ message: `Multiple tasks match "${task}"; re-run with the exact id.`, candidates: matches });
@@ -197,7 +194,7 @@ async function main(): Promise<void> {
         }
         taskId = matches[0].id;
       }
-      const element = buildTimesheetElement({
+      const element = buildTimesheetElement(tsCfg, {
         date: flag(args, "date") ?? new Date().toISOString().slice(0, 10),
         taskId,
         startTime: flag(args, "start"),
@@ -207,12 +204,12 @@ async function main(): Promise<void> {
         hoursType: flag(args, "type"),
         assignedUserId: client.userId ?? undefined,
       });
-      print(await client.create(TIMESHEET_MODULE, element));
+      print(await client.create(tsCfg.module, element));
       break;
     }
     case "my-timesheets": {
       await client.listTypes();
-      print(await listMyTimesheets(client, flag(args, "from"), flag(args, "to")));
+      print(await listMyTimesheets(client, tsCfg, flag(args, "from"), flag(args, "to")));
       break;
     }
     default:

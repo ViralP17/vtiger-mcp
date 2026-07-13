@@ -4,13 +4,16 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z, ZodRawShape } from "zod";
 import { createClientFromEnv, VtigerClient } from "../core/client.js";
 import {
-  TIMESHEET_MODULE,
-  PROJECT_MODULE,
-  TASK_MODULE,
+  timesheetConfigFromEnv,
   findTasks,
+  listProjects,
   buildTimesheetElement,
+  buildTimesheetUpdate,
   listMyTimesheets,
 } from "../core/timesheet.js";
+
+// Timesheet module/field names (defaults to TimeControl; override via env).
+const tsCfg = timesheetConfigFromEnv();
 
 /**
  * MCP stdio server that exposes the vtiger portal to an AI agent AS the
@@ -46,7 +49,7 @@ function fail(err: unknown): ToolResult {
   return { content: [{ type: "text", text: `Error: ${message}` }], isError: true };
 }
 
-const server = new McpServer({ name: "vtiger-mcp", version: "0.1.0" });
+const server = new McpServer({ name: "vtiger-mcp", version: "0.2.0" });
 
 /**
  * Register a tool with uniform error handling. `server.tool` is cast to
@@ -160,27 +163,22 @@ tool(
   "list_my_projects",
   "List projects the developer can access (id + name), to pick a project for timesheet logging.",
   {},
-  async () =>
-    ok(
-      await getClient().query(
-        `SELECT id, projectname, projectstatus FROM ${PROJECT_MODULE} ORDER BY projectname LIMIT 100;`,
-      ),
-    ),
+  async () => ok(await listProjects(getClient(), tsCfg)),
 );
 
 tool(
   "list_my_tasks",
-  "List project tasks (id + name) the developer can access. Optionally filter by a project-task name fragment. The task id is what a timesheet's 'related_to' links to.",
+  `List tasks (id + name) the developer can access in the ${tsCfg.taskModule} module. Optionally filter by a task-name fragment. The task id is what a timesheet's link field points to.`,
   { nameContains: z.string().optional().describe("Optional substring to match against the task name.") },
-  async ({ nameContains }) => ok(await findTasks(getClient(), nameContains ?? "")),
+  async ({ nameContains }) => ok(await findTasks(getClient(), tsCfg, nameContains ?? "")),
 );
 
 tool(
   "log_timesheet",
-  "Log a daily timesheet entry in the TimeControl module for the developer. Resolves a task by name or id, defaults the date to today and the owner to the current user, and computes total time from start/end when not given.",
+  `Log a daily timesheet entry in the ${tsCfg.module} module for the developer. Resolves a task by name or id, defaults the date to today and the owner to the current user, and computes total time from start/end when not given.`,
   {
     date: z.string().optional().describe("Entry date YYYY-MM-DD. Defaults to today."),
-    task: z.string().optional().describe("Project task name (searched) or webservice id, linked as related_to."),
+    task: z.string().optional().describe("Task name (searched) or webservice id, linked as the entry's related field."),
     startTime: z.string().optional().describe("Clock start HH:MM, e.g. '10:00'."),
     endTime: z.string().optional().describe("Clock end HH:MM, e.g. '13:00'."),
     totalTime: z.string().optional().describe("Explicit total HH:MM; computed from start/end if omitted."),
@@ -193,9 +191,9 @@ tool(
 
     let taskId: string | undefined;
     if (args.task) {
-      const matches = await findTasks(client, args.task);
+      const matches = await findTasks(client, tsCfg, args.task);
       if (matches.length === 0) {
-        throw new Error(`No project task found matching "${args.task}". Use list_my_tasks to browse.`);
+        throw new Error(`No task found matching "${args.task}". Use list_my_tasks to browse.`);
       }
       if (matches.length > 1) {
         return ok({
@@ -207,7 +205,7 @@ tool(
       taskId = matches[0].id;
     }
 
-    const element = buildTimesheetElement({
+    const element = buildTimesheetElement(tsCfg, {
       date: args.date ?? today(),
       taskId,
       startTime: args.startTime,
@@ -217,7 +215,7 @@ tool(
       hoursType: args.hoursType,
       assignedUserId: client.userId ?? undefined,
     });
-    const created = await client.create(TIMESHEET_MODULE, element);
+    const created = await client.create(tsCfg.module, element);
     return ok({ created });
   },
 );
@@ -232,15 +230,15 @@ tool(
   async ({ from, to }) => {
     const client = getClient();
     await client.listTypes(); // ensure login -> userId available
-    return ok(await listMyTimesheets(client, from, to));
+    return ok(await listMyTimesheets(client, tsCfg, from, to));
   },
 );
 
 tool(
   "update_timesheet",
-  "Update fields on an existing TimeControl timesheet entry (partial update).",
+  `Update fields on an existing ${tsCfg.module} timesheet entry (partial update).`,
   {
-    id: z.string().describe("Webservice id of the TimeControl record."),
+    id: z.string().describe(`Webservice id of the ${tsCfg.module} record.`),
     date: z.string().optional().describe("New date YYYY-MM-DD."),
     startTime: z.string().optional(),
     endTime: z.string().optional(),
@@ -249,16 +247,7 @@ tool(
     hoursType: z.string().optional(),
   },
   async ({ id, date, startTime, endTime, totalTime, activity, hoursType }) => {
-    const values: Record<string, any> = {};
-    if (date) {
-      values.date_start = date;
-      values.date_end = date;
-    }
-    if (startTime) values.time_start = startTime;
-    if (endTime) values.time_end = endTime;
-    if (totalTime) values.totaltime = totalTime;
-    if (activity) values.description = activity;
-    if (hoursType) values.hours_type = hoursType;
+    const values = buildTimesheetUpdate(tsCfg, { date, startTime, endTime, totalTime, activity, hoursType });
     return ok(await getClient().revise({ id, ...values }));
   },
 );
