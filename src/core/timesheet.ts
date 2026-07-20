@@ -19,6 +19,7 @@ export interface TimesheetFields {
   timeStart: string; // time_start
   timeEnd: string; // time_end
   relatedTo: string; // related_to (-> task)
+  projectId: string; // projectid (-> project); populates the "Project name" column
   description: string; // description (activity text)
   hoursType: string; // hours_type (picklist)
   totalTime: string; // totaltime (server-computed when times are given)
@@ -51,6 +52,7 @@ const DEFAULTS: TimesheetConfig = {
     timeStart: "time_start",
     timeEnd: "time_end",
     relatedTo: "related_to",
+    projectId: "projectid",
     description: "description",
     hoursType: "hours_type",
     totalTime: "totaltime",
@@ -77,6 +79,7 @@ export function timesheetConfigFromEnv(env: NodeJS.ProcessEnv = process.env): Ti
       timeStart: pick("VTIGER_TS_TIME_START_FIELD", DEFAULTS.fields.timeStart),
       timeEnd: pick("VTIGER_TS_TIME_END_FIELD", DEFAULTS.fields.timeEnd),
       relatedTo: pick("VTIGER_TS_RELATED_FIELD", DEFAULTS.fields.relatedTo),
+      projectId: pick("VTIGER_TS_PROJECT_FIELD", DEFAULTS.fields.projectId),
       description: pick("VTIGER_TS_DESC_FIELD", DEFAULTS.fields.description),
       hoursType: pick("VTIGER_TS_HOURSTYPE_FIELD", DEFAULTS.fields.hoursType),
       totalTime: pick("VTIGER_TS_TOTAL_FIELD", DEFAULTS.fields.totalTime),
@@ -145,6 +148,34 @@ export async function findTasks(
   }));
 }
 
+export interface ResolvedTask {
+  /** Set when exactly one task matched. */
+  taskId?: string;
+  /** The matched task's project, so the entry's "Project name" is filled in. */
+  projectId?: string;
+  /** Set instead of taskId when the name was ambiguous. */
+  candidates?: TaskMatch[];
+}
+
+/**
+ * Resolve a task reference to its id AND its parent project. Timesheet
+ * entries carry both `related_to` (the task) and `projectid` (the project);
+ * deriving the project here means callers never have to supply it, and the
+ * "Project name" column is always populated.
+ */
+export async function resolveTaskAndProject(
+  client: VtigerClient,
+  cfg: TimesheetConfig,
+  taskNameOrId: string,
+): Promise<ResolvedTask> {
+  const matches = await findTasks(client, cfg, taskNameOrId);
+  if (matches.length === 0) {
+    throw new Error(`No task found matching "${taskNameOrId}".`);
+  }
+  if (matches.length > 1) return { candidates: matches };
+  return { taskId: matches[0].id, projectId: matches[0].projectId };
+}
+
 /** List projects the user can access (id + name). */
 export async function listProjects(client: VtigerClient, cfg: TimesheetConfig): Promise<any[]> {
   return client.query(
@@ -190,7 +221,9 @@ export function buildTimesheetElement(
   };
   if (input.assignedUserId) element[f.owner] = input.assignedUserId;
   if (input.taskId) element[f.relatedTo] = input.taskId;
-  if (input.projectId) element[cfg.taskProjectField] = input.projectId;
+  // Populates the "Project name" column. Auto-derived from the task when the
+  // caller doesn't pass one (see resolveTaskAndProject).
+  if (input.projectId) element[f.projectId] = input.projectId;
   if (input.startTime) element[f.timeStart] = normalizeTime(input.startTime);
   if (input.endTime) element[f.timeEnd] = normalizeTime(input.endTime);
   if (input.activity) element[f.description] = input.activity;

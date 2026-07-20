@@ -5,6 +5,7 @@ import { createClientFromEnv } from "../core/client.js";
 import {
   timesheetConfigFromEnv,
   findTasks,
+  resolveTaskAndProject,
   listProjects,
   buildTimesheetElement,
   listMyTimesheets,
@@ -184,19 +185,21 @@ async function main(): Promise<void> {
     case "log-timesheet": {
       await client.listTypes(); // ensure login -> userId
       let taskId: string | undefined;
+      let projectId: string | undefined;
       const task = flag(args, "task");
       if (task) {
-        const matches = await findTasks(client, tsCfg, task);
-        if (matches.length === 0) throw new Error(`No task matches "${task}".`);
-        if (matches.length > 1) {
-          print({ message: `Multiple tasks match "${task}"; re-run with the exact id.`, candidates: matches });
+        const resolved = await resolveTaskAndProject(client, tsCfg, task);
+        if (resolved.candidates) {
+          print({ message: `Multiple tasks match "${task}"; re-run with the exact id.`, candidates: resolved.candidates });
           return;
         }
-        taskId = matches[0].id;
+        taskId = resolved.taskId;
+        projectId = resolved.projectId; // fills the "Project name" column
       }
       const element = buildTimesheetElement(tsCfg, {
         date: flag(args, "date") ?? new Date().toISOString().slice(0, 10),
         taskId,
+        projectId,
         startTime: flag(args, "start"),
         endTime: flag(args, "end"),
         totalTime: flag(args, "total"),

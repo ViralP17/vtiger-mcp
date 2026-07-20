@@ -1,6 +1,6 @@
 {
   "name": "vtiger-mcp",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "MCP server + CLI for vtiger CRM — log timesheets and create/update records in any module via an AI agent, using each user's own webservice access key (row-level access preserved).",
   "type": "module",
   "bin": {
