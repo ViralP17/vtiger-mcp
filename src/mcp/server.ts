@@ -6,6 +6,7 @@ import { createClientFromEnv, VtigerClient } from "../core/client.js";
 import {
   timesheetConfigFromEnv,
   findTasks,
+  resolveTaskAndProject,
   listProjects,
   buildTimesheetElement,
   buildTimesheetUpdate,
@@ -49,7 +50,7 @@ function fail(err: unknown): ToolResult {
   return { content: [{ type: "text", text: `Error: ${message}` }], isError: true };
 }
 
-const server = new McpServer({ name: "vtiger-mcp", version: "0.2.1" });
+const server = new McpServer({ name: "vtiger-mcp", version: "0.2.2" });
 
 /**
  * Register a tool with uniform error handling. `server.tool` is cast to
@@ -190,24 +191,24 @@ tool(
     await client.listTypes(); // ensure login -> userId available
 
     let taskId: string | undefined;
+    let projectId: string | undefined;
     if (args.task) {
-      const matches = await findTasks(client, tsCfg, args.task);
-      if (matches.length === 0) {
-        throw new Error(`No task found matching "${args.task}". Use list_my_tasks to browse.`);
-      }
-      if (matches.length > 1) {
+      const resolved = await resolveTaskAndProject(client, tsCfg, args.task);
+      if (resolved.candidates) {
         return ok({
           needsDisambiguation: true,
           message: `Multiple tasks match "${args.task}". Re-call log_timesheet with the exact task id.`,
-          candidates: matches,
+          candidates: resolved.candidates,
         });
       }
-      taskId = matches[0].id;
+      taskId = resolved.taskId;
+      projectId = resolved.projectId; // fills the "Project name" column
     }
 
     const element = buildTimesheetElement(tsCfg, {
       date: args.date ?? today(),
       taskId,
+      projectId,
       startTime: args.startTime,
       endTime: args.endTime,
       totalTime: args.totalTime,
