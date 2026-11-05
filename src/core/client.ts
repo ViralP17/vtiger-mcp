@@ -74,6 +74,16 @@ export class VtigerClient {
     return this.session?.userId ?? null;
   }
 
+  /** The CRM version reported at login, e.g. "6.5.0" / "7.5.0" / "8.2.0". Null before login. */
+  get vtigerVersion(): string | null {
+    return this.session?.vtigerVersion ?? null;
+  }
+
+  /** The webservice API version reported at login (e.g. "0.22"). Null before login. */
+  get apiVersion(): string | null {
+    return this.session?.version ?? null;
+  }
+
   // ---------------------------------------------------------------------------
   // Low-level transport
   // ---------------------------------------------------------------------------
@@ -195,6 +205,26 @@ export class VtigerClient {
     return this.call("query", { query: vtql });
   }
 
+  /**
+   * Run a SELECT and auto-paginate past vtiger's hard 100-row webservice
+   * cap (the same cap on every 6.x / 7.x / 8.x install). Pass VTQL WITHOUT a
+   * LIMIT clause; pages are fetched with `LIMIT offset, 100` until a short
+   * page signals the end.
+   */
+  async queryAll(vtqlNoLimit: string): Promise<any[]> {
+    const base = vtqlNoLimit.trim().replace(/;?\s*$/, "");
+    const pageSize = 100;
+    let offset = 0;
+    const all: any[] = [];
+    for (;;) {
+      const rows = await this.query(`${base} LIMIT ${offset}, ${pageSize};`);
+      all.push(...(rows ?? []));
+      if (!rows || rows.length < pageSize) break;
+      offset += pageSize;
+    }
+    return all;
+  }
+
   /** Fetch one record by its webservice id (e.g. "17x1234"). */
   async retrieve(id: string): Promise<any> {
     return this.call("retrieve", { id });
@@ -230,12 +260,17 @@ export class VtigerClient {
   }
 }
 
-/** Build a client from the standard environment variables. */
-export function createClientFromEnv(): VtigerClient {
-  return new VtigerClient({
+/** Read the standard environment variables into a config (no validation). */
+export function configFromEnv(): VtigerConfig {
+  return {
     url: process.env.VTIGER_URL ?? "",
     username: process.env.VTIGER_USERNAME ?? "",
     accessKey: process.env.VTIGER_ACCESS_KEY ?? "",
     allowDelete: (process.env.VTIGER_ALLOW_DELETE ?? "false").toLowerCase() === "true",
-  });
+  };
+}
+
+/** Build a client from the standard environment variables. */
+export function createClientFromEnv(): VtigerClient {
+  return new VtigerClient(configFromEnv());
 }

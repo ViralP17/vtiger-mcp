@@ -2,7 +2,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z, ZodRawShape } from "zod";
-import { createClientFromEnv, VtigerClient } from "../core/client.js";
+import { createClientFromEnv, configFromEnv, VtigerClient } from "../core/client.js";
+import { runDoctor } from "../core/doctor.js";
 import {
   timesheetConfigFromEnv,
   findTasks,
@@ -50,7 +51,7 @@ function fail(err: unknown): ToolResult {
   return { content: [{ type: "text", text: `Error: ${message}` }], isError: true };
 }
 
-const server = new McpServer({ name: "vtiger-mcp", version: "0.2.2" });
+const server = new McpServer({ name: "vtiger-mcp", version: "0.3.0" });
 
 /**
  * Register a tool with uniform error handling. `server.tool` is cast to
@@ -71,6 +72,17 @@ function tool<S extends ZodRawShape>(
     }
   });
 }
+
+// ---------------------------------------------------------------------------
+// Setup / diagnostics
+// ---------------------------------------------------------------------------
+
+tool(
+  "diagnose",
+  "Run a connection self-test against the vtiger server: verifies the URL and webservice.php are reachable, the access key authenticates, reports the detected vtiger version (and whether it's a supported 6.x/7.x/8.x), lists module access, and confirms the timesheet module. Each failure comes with a fix. Use this FIRST when setup isn't working.",
+  {},
+  async () => ok(await runDoctor(configFromEnv(), tsCfg)),
+);
 
 // ---------------------------------------------------------------------------
 // Generic, any-module tools (subject to the developer's own permissions)
@@ -156,7 +168,12 @@ tool(
     } catch {
       // Non-admin users cannot query the Users module; the userId alone is enough.
     }
-    return ok({ userId: client.userId, user });
+    return ok({
+      userId: client.userId,
+      vtigerVersion: client.vtigerVersion,
+      apiVersion: client.apiVersion,
+      user,
+    });
   },
 );
 

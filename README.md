@@ -10,7 +10,7 @@ AI agent (Claude Desktop, Claude Code, Cursor, …) to your vtiger CRM to
 plain English.
 
 It talks to vtiger's built-in REST API (`/webservice.php`, available in
-vtiger 6.x / 7.x). It adds **no** access rules of its own: every call runs
+self-hosted vtiger 6.x / 7.x / 8.x). It adds **no** access rules of its own: every call runs
 **as the authenticated user**, so vtiger enforces that user's role,
 profile, and row-level sharing automatically. Each person uses their own
 **Webservice Access Key**, so they only see and change what their account
@@ -78,9 +78,36 @@ exact config.
 ## Requirements
 
 - **Node.js 18+**
-- A vtiger CRM (6.x / 7.x) whose `/webservice.php` endpoint is reachable
+- A **self-hosted** vtiger CRM (6.x / 7.x / 8.x, open source) whose
+  `/webservice.php` endpoint is reachable
 - Your **Webservice Access Key** — in the CRM: *My Preferences →
   "Webservice Access Key"* (a 16-char string; **not** your login password)
+
+## Compatibility
+
+Works on **self-hosted, open-source vtiger** across major versions. The REST
+webservice (`/webservice.php`) is stable across them, so the same connector is
+version-agnostic:
+
+| vtiger (self-hosted OSS) | Status |
+|---|---|
+| 6.x | ✅ Supported |
+| 7.x | ✅ Supported |
+| 8.x | ✅ Supported |
+| vtiger **Cloud** (hosted on vtiger.com) | ❌ Not supported — different API |
+
+Not sure about your install? Run the built-in self-test. It reports your exact
+version and pinpoints common setup problems (unreachable `webservice.php`,
+wrong access key, custom module names) with a fix for each:
+
+```bash
+npx -p vtiger-mcp vtiger doctor
+```
+
+…or ask your AI agent to run the **`diagnose`** tool. Field and module names
+vary between versions and customized installs, so the timesheet helpers are
+[configurable](#configuring-the-timesheet-module-other-vtiger-installs) and the
+generic tools always `describe_module` the live schema first.
 
 ## Install
 
@@ -167,6 +194,7 @@ export VTIGER_URL=https://yourcrmdomain.com
 export VTIGER_USERNAME=your.username
 export VTIGER_ACCESS_KEY=your-access-key   # or put these in a .env file
 
+vtiger doctor     # connection self-test + detected vtiger version
 vtiger whoami
 vtiger modules
 vtiger describe TimeControl
@@ -183,6 +211,7 @@ vtiger update 17x1234 --set description="Revised notes"
 
 | Tool | What it does |
 |---|---|
+| `diagnose` | Connection self-test: reachability, auth, detected vtiger version, timesheet module (run first) |
 | `list_modules` | Modules you can access |
 | `describe_module` | Live fields of a module (names, mandatory, picklists, references) |
 | `query` | Read-only VTQL `SELECT` |
