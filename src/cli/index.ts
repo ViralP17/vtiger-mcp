@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { createClientFromEnv } from "../core/client.js";
+import { createClientFromEnv, configFromEnv } from "../core/client.js";
+import { runDoctor, DoctorReport } from "../core/doctor.js";
 import {
   timesheetConfigFromEnv,
   findTasks,
@@ -86,9 +87,31 @@ function print(data: unknown): void {
   );
 }
 
+/** Human-readable rendering of the connection self-test. */
+function printDoctor(report: DoctorReport): void {
+  const label = (s: string) => (s === "ok" ? "OK  " : s === "warn" ? "WARN" : "FAIL");
+  print(`vtiger doctor — ${report.endpoint}`);
+  if (report.vtigerVersion) {
+    print(
+      `  vtiger version: ${report.vtigerVersion}` +
+        (report.supported === false ? " (outside tested 6.x/7.x/8.x — may still work)" : ""),
+    );
+  }
+  for (const c of report.checks) {
+    process.stdout.write(`  [${label(c.status)}] ${c.name}: ${c.detail}\n`);
+    if (c.fix) process.stdout.write(`         fix: ${c.fix}\n`);
+  }
+  print(
+    report.ok
+      ? "\nAll good — the connector can reach vtiger."
+      : "\nSetup incomplete — fix the FAIL item(s) above, then re-run 'vtiger doctor'.",
+  );
+}
+
 const USAGE = `vtiger — CLI for vtiger CRM
 
 Usage:
+  vtiger doctor                              (test the connection & report version)
   vtiger whoami
   vtiger modules
   vtiger describe <Module>
@@ -119,6 +142,14 @@ async function main(): Promise<void> {
     return;
   }
 
+  // `doctor` must run even when credentials are missing/wrong — it reports that.
+  if (command === "doctor") {
+    const report = await runDoctor(configFromEnv(), timesheetConfigFromEnv());
+    printDoctor(report);
+    process.exitCode = report.ok ? 0 : 1;
+    return;
+  }
+
   const client = createClientFromEnv();
   const tsCfg = timesheetConfigFromEnv();
 
@@ -134,7 +165,12 @@ async function main(): Promise<void> {
       } catch {
         // Non-admin users cannot query the Users module; userId alone is enough.
       }
-      print({ userId: client.userId, user });
+      print({
+        userId: client.userId,
+        vtigerVersion: client.vtigerVersion,
+        apiVersion: client.apiVersion,
+        user,
+      });
       break;
     }
     case "modules":
