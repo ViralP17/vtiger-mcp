@@ -139,6 +139,7 @@ file for the CLI — see [.env.example](.env.example)):
 | `VTIGER_USERNAME` | `your.username` | Your vtiger login |
 | `VTIGER_ACCESS_KEY` | `xxxxxxxxxxxxxxxx` | Webservice Access Key |
 | `VTIGER_ALLOW_DELETE` | `false` | Set `true` to allow `delete` |
+| `VTIGER_TIMEOUT_MS` | `30000` | Abort a request after this many ms (hung-server guard) |
 
 ## Use as an MCP server
 

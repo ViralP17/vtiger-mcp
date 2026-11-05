@@ -21,6 +21,8 @@ export interface VtigerConfig {
   accessKey: string;
   /** When false, delete() throws before hitting the API. Default false. */
   allowDelete?: boolean;
+  /** Abort a webservice request after this many ms (guards against a hung server). Default 30000. */
+  timeoutMs?: number;
 }
 
 /** Shape of a successful login result from vtiger. */
@@ -59,6 +61,7 @@ function md5(input: string): string {
 export class VtigerClient {
   private readonly endpoint: string;
   private readonly config: VtigerConfig;
+  private readonly timeoutMs: number;
   private session: LoginResult | null = null;
 
   constructor(config: VtigerConfig) {
@@ -67,6 +70,7 @@ export class VtigerClient {
     if (!config.accessKey) throw new Error("VTIGER_ACCESS_KEY is required");
     this.config = config;
     this.endpoint = config.url.replace(/\/+$/, "") + "/webservice.php";
+    this.timeoutMs = config.timeoutMs && config.timeoutMs > 0 ? config.timeoutMs : 30000;
   }
 
   /** The vtiger user id of the authenticated developer (e.g. "19x5"). Requires a prior login. */
@@ -96,24 +100,42 @@ export class VtigerClient {
     const method = GET_OPERATIONS.has(operation) ? "GET" : "POST";
     const query = new URLSearchParams({ operation, ...params });
 
+    // Abort a request that hangs so a slow/broken server can't block forever.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     let response: Response;
-    if (method === "GET") {
-      response = await fetch(`${this.endpoint}?${query.toString()}`, {
-        method: "GET",
-        headers: { Accept: "application/json" },
-      });
-    } else {
-      response = await fetch(this.endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          Accept: "application/json",
-        },
-        body: query.toString(),
-      });
+    let text: string;
+    try {
+      if (method === "GET") {
+        response = await fetch(`${this.endpoint}?${query.toString()}`, {
+          method: "GET",
+          headers: { Accept: "application/json" },
+          signal: controller.signal,
+        });
+      } else {
+        response = await fetch(this.endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            Accept: "application/json",
+          },
+          body: query.toString(),
+          signal: controller.signal,
+        });
+      }
+      text = await response.text();
+    } catch (err) {
+      if (controller.signal.aborted) {
+        throw new VtigerError(
+          "TIMEOUT",
+          `webservice.php did not respond within ${this.timeoutMs}ms (operation "${operation}"). Set VTIGER_TIMEOUT_MS to change this.`,
+        );
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
     }
 
-    const text = await response.text();
     let payload: any;
     try {
       payload = JSON.parse(text);
@@ -267,6 +289,7 @@ export function configFromEnv(): VtigerConfig {
     username: process.env.VTIGER_USERNAME ?? "",
     accessKey: process.env.VTIGER_ACCESS_KEY ?? "",
     allowDelete: (process.env.VTIGER_ALLOW_DELETE ?? "false").toLowerCase() === "true",
+    timeoutMs: process.env.VTIGER_TIMEOUT_MS ? Number(process.env.VTIGER_TIMEOUT_MS) : undefined,
   };
 }
 

@@ -15,6 +15,9 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   concrete fix on every failure. Run it first when setup isn't working.
 - **Version reporting.** `whoami` (and the client) now surface the live
   `vtigerVersion` and webservice `apiVersion` from login.
+- **Request timeout.** Webservice calls abort after `VTIGER_TIMEOUT_MS`
+  (default 30000) instead of hanging on a slow or broken server, surfaced as a
+  clear `TIMEOUT` error.
 - `VtigerClient.vtigerVersion` / `.apiVersion` getters, `configFromEnv()`,
   and `SUPPORTED_MAJORS`.
 
