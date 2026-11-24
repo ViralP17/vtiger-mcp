@@ -33,6 +33,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Notes
 - No breaking changes. vtiger **Cloud** (vtiger.com hosted) uses a different
   API and is out of scope — this targets self-hosted open-source installs.
+- Read + write certified via live dynamic (describe-driven) any-module CRUD on
+  vtiger **6.5.0**, **7.1.0**, and **8.3.0**.
 
 ## [0.2.2] - 2026-07-13
 

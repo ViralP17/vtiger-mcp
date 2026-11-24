@@ -91,10 +91,14 @@ version-agnostic:
 
 | vtiger (self-hosted OSS) | Status |
 |---|---|
-| 6.x | ✅ Supported |
-| 7.x | ✅ Supported |
-| 8.x | ✅ Supported |
+| 6.x | ✅ Supported — verified on 6.5.0 |
+| 7.x | ✅ Supported — verified on 7.1.0 |
+| 8.x | ✅ Supported — verified on 8.3.0 |
 | vtiger **Cloud** (hosted on vtiger.com) | ❌ Not supported — different API |
+
+Verified = full read **and** write (create/update/delete) certified against a live
+install of that version, driving modules by their **live schema** — nothing is
+hardcoded, so custom modules and fields work too.
 
 Not sure about your install? Run the built-in self-test. It reports your exact
 version and pinpoints common setup problems (unreachable `webservice.php`,
