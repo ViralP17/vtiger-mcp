@@ -116,6 +116,9 @@ vary between versions and customized installs, so the timesheet helpers are
 [configurable](#configuring-the-timesheet-module-other-vtiger-installs) and the
 generic tools always `describe_module` the live schema first.
 
+> 📋 Full matrix, per-version notes, and troubleshooting:
+> **[docs/VERSION-SUPPORT.md](docs/VERSION-SUPPORT.md)**.
+
 ## Install
 
 ```bash
