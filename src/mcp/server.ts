@@ -2,7 +2,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z, ZodRawShape } from "zod";
-import { createClientFromEnv, VtigerClient } from "../core/client.js";
+import { createClientFromEnv, configFromEnv, VtigerClient } from "../core/client.js";
+import { runDoctor } from "../core/doctor.js";
+import { getSchema, prepareElement, validationEnabled } from "../core/schema.js";
 import {
   timesheetConfigFromEnv,
   findTasks,
@@ -50,7 +52,7 @@ function fail(err: unknown): ToolResult {
   return { content: [{ type: "text", text: `Error: ${message}` }], isError: true };
 }
 
-const server = new McpServer({ name: "vtiger-mcp", version: "0.2.2" });
+const server = new McpServer({ name: "vtiger-mcp", version: "0.3.0" });
 
 /**
  * Register a tool with uniform error handling. `server.tool` is cast to
@@ -71,6 +73,17 @@ function tool<S extends ZodRawShape>(
     }
   });
 }
+
+// ---------------------------------------------------------------------------
+// Setup / diagnostics
+// ---------------------------------------------------------------------------
+
+tool(
+  "diagnose",
+  "Run a connection self-test against the vtiger server: verifies the URL and webservice.php are reachable, the access key authenticates, reports the detected vtiger version (and whether it's a supported 6.x/7.x/8.x), lists module access, and confirms the timesheet module. Each failure comes with a fix. Use this FIRST when setup isn't working.",
+  {},
+  async () => ok(await runDoctor(configFromEnv(), tsCfg)),
+);
 
 // ---------------------------------------------------------------------------
 // Generic, any-module tools (subject to the developer's own permissions)
@@ -111,22 +124,52 @@ tool(
 
 tool(
   "create_record",
-  "Create a record in any module the developer can write to. Provide field values as an object; use describe_module first to get exact field names. Reference fields (owners, related records) take webservice ids.",
+  "Create a record in any module the developer can write to. Values are validated against the module's LIVE schema (required fields, picklist values, field names) and a precise error is returned if something's off. Reference fields (owners, related records) take webservice ids — if a required reference is reported, query that target module for an id.",
   {
     module: z.string().describe("Target module name, e.g. 'ProjectTask'."),
     values: z.record(z.any()).describe("Field name -> value map for the new record."),
   },
-  async ({ module, values }) => ok(await getClient().create(module, values)),
+  async ({ module, values }) => {
+    const client = getClient();
+    let payload = values;
+    if (validationEnabled()) {
+      const schema = await getSchema(client, module);
+      if (!schema.createable) throw new Error(`Module '${module}' is not createable for this user.`);
+      const { values: prepared, issues } = prepareElement(schema, values, { forCreate: true });
+      if (issues.length) {
+        throw new Error(
+          `Cannot create ${module}: ${issues.join("; ")}. Call describe_module('${module}') for the full field list.`,
+        );
+      }
+      payload = prepared;
+    }
+    return ok(await client.create(module, payload));
+  },
 );
 
 tool(
   "update_record",
-  "Update fields on an existing record (partial update — only supplied fields change). Uses vtiger 'revise'.",
+  "Update fields on an existing record (partial update — only supplied fields change). Uses vtiger 'revise'. Pass 'module' to validate the values against the live schema (picklist values, field names) before sending.",
   {
     id: z.string().describe("Webservice id of the record to update."),
     values: z.record(z.any()).describe("Field name -> new value map."),
+    module: z.string().optional().describe("Optional module name; enables schema validation of the values."),
   },
-  async ({ id, values }) => ok(await getClient().revise({ id, ...values })),
+  async ({ id, values, module }) => {
+    const client = getClient();
+    let payload = values;
+    if (module && validationEnabled()) {
+      const schema = await getSchema(client, module);
+      const { values: prepared, issues } = prepareElement(schema, values, { forCreate: false });
+      if (issues.length) {
+        throw new Error(
+          `Cannot update ${module}: ${issues.join("; ")}. Call describe_module('${module}') for the full field list.`,
+        );
+      }
+      payload = prepared;
+    }
+    return ok(await client.revise({ id, ...payload }));
+  },
 );
 
 tool(
@@ -156,7 +199,12 @@ tool(
     } catch {
       // Non-admin users cannot query the Users module; the userId alone is enough.
     }
-    return ok({ userId: client.userId, user });
+    return ok({
+      userId: client.userId,
+      vtigerVersion: client.vtigerVersion,
+      apiVersion: client.apiVersion,
+      user,
+    });
   },
 );
 

@@ -21,6 +21,8 @@ export interface VtigerConfig {
   accessKey: string;
   /** When false, delete() throws before hitting the API. Default false. */
   allowDelete?: boolean;
+  /** Abort a webservice request after this many ms (guards against a hung server). Default 30000. */
+  timeoutMs?: number;
 }
 
 /** Shape of a successful login result from vtiger. */
@@ -59,6 +61,7 @@ function md5(input: string): string {
 export class VtigerClient {
   private readonly endpoint: string;
   private readonly config: VtigerConfig;
+  private readonly timeoutMs: number;
   private session: LoginResult | null = null;
 
   constructor(config: VtigerConfig) {
@@ -67,11 +70,22 @@ export class VtigerClient {
     if (!config.accessKey) throw new Error("VTIGER_ACCESS_KEY is required");
     this.config = config;
     this.endpoint = config.url.replace(/\/+$/, "") + "/webservice.php";
+    this.timeoutMs = config.timeoutMs && config.timeoutMs > 0 ? config.timeoutMs : 30000;
   }
 
   /** The vtiger user id of the authenticated developer (e.g. "19x5"). Requires a prior login. */
   get userId(): string | null {
     return this.session?.userId ?? null;
+  }
+
+  /** The CRM version reported at login, e.g. "6.5.0" / "7.5.0" / "8.2.0". Null before login. */
+  get vtigerVersion(): string | null {
+    return this.session?.vtigerVersion ?? null;
+  }
+
+  /** The webservice API version reported at login (e.g. "0.22"). Null before login. */
+  get apiVersion(): string | null {
+    return this.session?.version ?? null;
   }
 
   // ---------------------------------------------------------------------------
@@ -86,24 +100,42 @@ export class VtigerClient {
     const method = GET_OPERATIONS.has(operation) ? "GET" : "POST";
     const query = new URLSearchParams({ operation, ...params });
 
+    // Abort a request that hangs so a slow/broken server can't block forever.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     let response: Response;
-    if (method === "GET") {
-      response = await fetch(`${this.endpoint}?${query.toString()}`, {
-        method: "GET",
-        headers: { Accept: "application/json" },
-      });
-    } else {
-      response = await fetch(this.endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          Accept: "application/json",
-        },
-        body: query.toString(),
-      });
+    let text: string;
+    try {
+      if (method === "GET") {
+        response = await fetch(`${this.endpoint}?${query.toString()}`, {
+          method: "GET",
+          headers: { Accept: "application/json" },
+          signal: controller.signal,
+        });
+      } else {
+        response = await fetch(this.endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            Accept: "application/json",
+          },
+          body: query.toString(),
+          signal: controller.signal,
+        });
+      }
+      text = await response.text();
+    } catch (err) {
+      if (controller.signal.aborted) {
+        throw new VtigerError(
+          "TIMEOUT",
+          `webservice.php did not respond within ${this.timeoutMs}ms (operation "${operation}"). Set VTIGER_TIMEOUT_MS to change this.`,
+        );
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
     }
 
-    const text = await response.text();
     let payload: any;
     try {
       payload = JSON.parse(text);
@@ -195,6 +227,26 @@ export class VtigerClient {
     return this.call("query", { query: vtql });
   }
 
+  /**
+   * Run a SELECT and auto-paginate past vtiger's hard 100-row webservice
+   * cap (the same cap on every 6.x / 7.x / 8.x install). Pass VTQL WITHOUT a
+   * LIMIT clause; pages are fetched with `LIMIT offset, 100` until a short
+   * page signals the end.
+   */
+  async queryAll(vtqlNoLimit: string): Promise<any[]> {
+    const base = vtqlNoLimit.trim().replace(/;?\s*$/, "");
+    const pageSize = 100;
+    let offset = 0;
+    const all: any[] = [];
+    for (;;) {
+      const rows = await this.query(`${base} LIMIT ${offset}, ${pageSize};`);
+      all.push(...(rows ?? []));
+      if (!rows || rows.length < pageSize) break;
+      offset += pageSize;
+    }
+    return all;
+  }
+
   /** Fetch one record by its webservice id (e.g. "17x1234"). */
   async retrieve(id: string): Promise<any> {
     return this.call("retrieve", { id });
@@ -230,12 +282,18 @@ export class VtigerClient {
   }
 }
 
-/** Build a client from the standard environment variables. */
-export function createClientFromEnv(): VtigerClient {
-  return new VtigerClient({
+/** Read the standard environment variables into a config (no validation). */
+export function configFromEnv(): VtigerConfig {
+  return {
     url: process.env.VTIGER_URL ?? "",
     username: process.env.VTIGER_USERNAME ?? "",
     accessKey: process.env.VTIGER_ACCESS_KEY ?? "",
     allowDelete: (process.env.VTIGER_ALLOW_DELETE ?? "false").toLowerCase() === "true",
-  });
+    timeoutMs: process.env.VTIGER_TIMEOUT_MS ? Number(process.env.VTIGER_TIMEOUT_MS) : undefined,
+  };
+}
+
+/** Build a client from the standard environment variables. */
+export function createClientFromEnv(): VtigerClient {
+  return new VtigerClient(configFromEnv());
 }

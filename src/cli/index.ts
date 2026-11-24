@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { createClientFromEnv } from "../core/client.js";
+import { createClientFromEnv, configFromEnv } from "../core/client.js";
+import { runDoctor, DoctorReport } from "../core/doctor.js";
+import { getSchema, prepareElement, validationEnabled } from "../core/schema.js";
 import {
   timesheetConfigFromEnv,
   findTasks,
@@ -86,9 +88,31 @@ function print(data: unknown): void {
   );
 }
 
+/** Human-readable rendering of the connection self-test. */
+function printDoctor(report: DoctorReport): void {
+  const label = (s: string) => (s === "ok" ? "OK  " : s === "warn" ? "WARN" : "FAIL");
+  print(`vtiger doctor — ${report.endpoint}`);
+  if (report.vtigerVersion) {
+    print(
+      `  vtiger version: ${report.vtigerVersion}` +
+        (report.supported === false ? " (outside tested 6.x/7.x/8.x — may still work)" : ""),
+    );
+  }
+  for (const c of report.checks) {
+    process.stdout.write(`  [${label(c.status)}] ${c.name}: ${c.detail}\n`);
+    if (c.fix) process.stdout.write(`         fix: ${c.fix}\n`);
+  }
+  print(
+    report.ok
+      ? "\nAll good — the connector can reach vtiger."
+      : "\nSetup incomplete — fix the FAIL item(s) above, then re-run 'vtiger doctor'.",
+  );
+}
+
 const USAGE = `vtiger — CLI for vtiger CRM
 
 Usage:
+  vtiger doctor                              (test the connection & report version)
   vtiger whoami
   vtiger modules
   vtiger describe <Module>
@@ -119,6 +143,14 @@ async function main(): Promise<void> {
     return;
   }
 
+  // `doctor` must run even when credentials are missing/wrong — it reports that.
+  if (command === "doctor") {
+    const report = await runDoctor(configFromEnv(), timesheetConfigFromEnv());
+    printDoctor(report);
+    process.exitCode = report.ok ? 0 : 1;
+    return;
+  }
+
   const client = createClientFromEnv();
   const tsCfg = timesheetConfigFromEnv();
 
@@ -134,7 +166,12 @@ async function main(): Promise<void> {
       } catch {
         // Non-admin users cannot query the Users module; userId alone is enough.
       }
-      print({ userId: client.userId, user });
+      print({
+        userId: client.userId,
+        vtigerVersion: client.vtigerVersion,
+        apiVersion: client.apiVersion,
+        user,
+      });
       break;
     }
     case "modules":
@@ -161,13 +198,29 @@ async function main(): Promise<void> {
     case "create": {
       const module = args.positionals[0];
       if (!module) throw new Error("Usage: vtiger create <Module> --set field=value");
-      print(await client.create(module, collectSet(args)));
+      let payload = collectSet(args);
+      if (validationEnabled()) {
+        const schema = await getSchema(client, module);
+        if (!schema.createable) throw new Error(`Module '${module}' is not createable for this user.`);
+        const { values, issues } = prepareElement(schema, payload, { forCreate: true });
+        if (issues.length) throw new Error(`Cannot create ${module}: ${issues.join("; ")}`);
+        payload = values;
+      }
+      print(await client.create(module, payload));
       break;
     }
     case "update": {
       const id = args.positionals[0];
-      if (!id) throw new Error("Usage: vtiger update <id> --set field=value");
-      print(await client.revise({ id, ...collectSet(args) }));
+      if (!id) throw new Error("Usage: vtiger update <id> --set field=value [--module <Module>]");
+      let payload = collectSet(args);
+      const module = flag(args, "module");
+      if (module && validationEnabled()) {
+        const schema = await getSchema(client, module);
+        const { values, issues } = prepareElement(schema, payload, { forCreate: false });
+        if (issues.length) throw new Error(`Cannot update ${module}: ${issues.join("; ")}`);
+        payload = values;
+      }
+      print(await client.revise({ id, ...payload }));
       break;
     }
     case "delete": {

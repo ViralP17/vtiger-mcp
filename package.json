@@ -1,6 +1,6 @@
 {
   "name": "vtiger-mcp",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "MCP server + CLI for vtiger CRM — log timesheets and create/update records in any module via an AI agent, using each user's own webservice access key (row-level access preserved).",
   "type": "module",
   "bin": {
@@ -21,6 +21,8 @@
     "mcp": "node dist/mcp/server.js",
     "cli": "node dist/cli/index.js",
     "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test",
+    "certify": "npm run build && node scripts/certify.mjs",
     "prepublishOnly": "npm run build"
   },
   "engines": {

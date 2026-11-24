@@ -178,8 +178,8 @@ export async function resolveTaskAndProject(
 
 /** List projects the user can access (id + name). */
 export async function listProjects(client: VtigerClient, cfg: TimesheetConfig): Promise<any[]> {
-  return client.query(
-    `SELECT id, ${cfg.projectNameField} FROM ${cfg.projectModule} ORDER BY ${cfg.projectNameField} LIMIT 100;`,
+  return client.queryAll(
+    `SELECT id, ${cfg.projectNameField} FROM ${cfg.projectModule} ORDER BY ${cfg.projectNameField}`,
   );
 }
 
@@ -276,7 +276,7 @@ export async function listMyTimesheets(
   if (from) clauses.push(`${f.dateStart} >= '${escapeVtql(from)}'`);
   if (to) clauses.push(`${f.dateStart} <= '${escapeVtql(to)}'`);
   const where = clauses.length ? ` WHERE ${clauses.join(" AND ")}` : "";
-  return client.query(
-    `SELECT * FROM ${cfg.module}${where} ORDER BY ${f.dateStart} DESC LIMIT 100;`,
+  return client.queryAll(
+    `SELECT * FROM ${cfg.module}${where} ORDER BY ${f.dateStart} DESC`,
   );
 }
