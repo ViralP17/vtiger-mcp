@@ -3,6 +3,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { createClientFromEnv, configFromEnv } from "../core/client.js";
 import { runDoctor, DoctorReport } from "../core/doctor.js";
+import { getSchema, prepareElement, validationEnabled } from "../core/schema.js";
 import {
   timesheetConfigFromEnv,
   findTasks,
@@ -197,13 +198,29 @@ async function main(): Promise<void> {
     case "create": {
       const module = args.positionals[0];
       if (!module) throw new Error("Usage: vtiger create <Module> --set field=value");
-      print(await client.create(module, collectSet(args)));
+      let payload = collectSet(args);
+      if (validationEnabled()) {
+        const schema = await getSchema(client, module);
+        if (!schema.createable) throw new Error(`Module '${module}' is not createable for this user.`);
+        const { values, issues } = prepareElement(schema, payload, { forCreate: true });
+        if (issues.length) throw new Error(`Cannot create ${module}: ${issues.join("; ")}`);
+        payload = values;
+      }
+      print(await client.create(module, payload));
       break;
     }
     case "update": {
       const id = args.positionals[0];
-      if (!id) throw new Error("Usage: vtiger update <id> --set field=value");
-      print(await client.revise({ id, ...collectSet(args) }));
+      if (!id) throw new Error("Usage: vtiger update <id> --set field=value [--module <Module>]");
+      let payload = collectSet(args);
+      const module = flag(args, "module");
+      if (module && validationEnabled()) {
+        const schema = await getSchema(client, module);
+        const { values, issues } = prepareElement(schema, payload, { forCreate: false });
+        if (issues.length) throw new Error(`Cannot update ${module}: ${issues.join("; ")}`);
+        payload = values;
+      }
+      print(await client.revise({ id, ...payload }));
       break;
     }
     case "delete": {

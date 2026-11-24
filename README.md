@@ -70,6 +70,9 @@ exact config.
   access preserved, nothing centralized.
 - 🧩 **Any module**: `create`, `update`, `query`, `describe`, `retrieve`,
   `delete` — subject to the user's permissions.
+- ✅ **Schema-validated writes**: `create` / `update` are checked against the
+  live `describe` (required fields, picklist values, field names), so you get a
+  precise, fixable error instead of an opaque server failure.
 - ⏱️ **Timesheet helpers** for the time-tracking module (create/list/update
   entries, resolve tasks by name).
 - 🖥️ Ships as both an **MCP server** (for AI agents) and a **CLI**.
@@ -144,6 +147,7 @@ file for the CLI — see [.env.example](.env.example)):
 | `VTIGER_ACCESS_KEY` | `xxxxxxxxxxxxxxxx` | Webservice Access Key |
 | `VTIGER_ALLOW_DELETE` | `false` | Set `true` to allow `delete` |
 | `VTIGER_TIMEOUT_MS` | `30000` | Abort a request after this many ms (hung-server guard) |
+| `VTIGER_SKIP_VALIDATION` | `false` | Set `true` to skip create/update schema validation |
 
 ## Use as an MCP server
 

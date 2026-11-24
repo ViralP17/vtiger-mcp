@@ -21,6 +21,7 @@
     "mcp": "node dist/mcp/server.js",
     "cli": "node dist/cli/index.js",
     "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test",
     "prepublishOnly": "npm run build"
   },
   "engines": {

@@ -15,6 +15,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   concrete fix on every failure. Run it first when setup isn't working.
 - **Version reporting.** `whoami` (and the client) now surface the live
   `vtigerVersion` and webservice `apiVersion` from login.
+- **Schema-validated writes.** `create_record` / `update_record` (and the CLI
+  `create` / `update`) validate values against the module's **live `describe`**
+  before sending — required fields on create, picklist values (case-normalised),
+  and field names — returning a precise, fixable error instead of an opaque
+  server failure. Describe results are cached per session. Bypass with
+  `VTIGER_SKIP_VALIDATION=true`. New `src/core/schema.ts` + unit tests
+  (`npm test`).
 - **Request timeout.** Webservice calls abort after `VTIGER_TIMEOUT_MS`
   (default 30000) instead of hanging on a slow or broken server, surfaced as a
   clear `TIMEOUT` error.
